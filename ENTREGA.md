@@ -15,8 +15,9 @@ El primer commit del repo es el proyecto tal como se entregó; el diff contra es
 | `ui/Catalogo.kt` | Se quita el `LaunchedEffect` que recargaba; la falla ya no oculta la lista; estados vacíos. |
 | `ui/Portada.kt` | Estado de la lista elevado (volver al mismo punto) y aviso si la ficha abierta fue retirada. |
 | `data/Sincronizacion.kt` (nuevo) | `ResultadoSync` (sealed) y reglas puras `Instantanea` (validar fichas, fusionar marcas, detectar retiradas). |
-| `app/build.gradle.kts` | OkHttp 4.12 explícito (el original no compilaba) y JUnit para los tests. |
+| `app/build.gradle.kts` | OkHttp 4.12 explícito (el original no compilaba), `versionCode` 13 / `versionName` 1.3 (es una actualización de una app instalada), JUnit y coroutines-test. |
 | `app/src/test/.../InstantaneaTest.kt` (nuevo) | 6 tests unitarios con los casos v1→v2→v3→v4 del enunciado. |
+| `app/src/test/.../ProgramaModelTest.kt` (nuevo) | 3 tests del ViewModel con un fake de `Agenda`: una carga por proceso, doble toque = un intento, filtros en `SavedStateHandle`. |
 
 No se tocaron `lab/ServicioLocal.kt` ni `ui/Mesa.kt` (son el banco de pruebas) ni `legacy/AgendaImpresa.kt` (código sin uso, fuera del alcance).
 
@@ -81,12 +82,35 @@ No se tocaron `lab/ServicioLocal.kt` ni `ui/Mesa.kt` (son el banco de pruebas) n
 | E3 | Cada ViewModel creaba **su propia** base Room, Retrofit/OkHttp y `ServicioLocal`; el ViewModel creaba sus dependencias. | Varias conexiones a la misma base, pool de conexiones desperdiciado, contador de sesión inconsistente, imposible testear con un fake. | `Servicios.de(context)` singleton con `applicationContext` + `ProgramaModel.Factory` que **inyecta** `Agenda` (interfaz), `ServicioLocal`, `SesionDeCarga` y `SavedStateHandle`. |
 | E4 | `dia`, `aviso` y `cargando` eran `MutableStateFlow` **públicos** y la UI los escribía (`model.dia.value = it`); el error era un `String`. | No hay un dueño del estado (rompe UDF); combinaciones imposibles (cargando + aviso viejo). | Un solo `StateFlow<ProgramaUiState>` de solo lectura; la UI emite intenciones (`elegirDia`, `actualizar`, `marcar`); error modelado con `sealed interface ResultadoSync` y `when` exhaustivo. |
 | E5 | Gson ignora la nulabilidad de Kotlin. | Una ficha sin `title` deja `null` en un `String` "no nulo" y explota después en la UI. | `FichaRemota` con campos nulables y validación en `Instantanea.aCharla`; una ficha incompleta invalida la instantánea entera (se conserva la edición anterior). |
+| E7 | El aviso de "datos guardados" estaba solo en el catálogo. | En Mi agenda o en una ficha la falla no se informaba (la consigna pide conservar lista, detalle y favoritas **e informar**). | `AvisoSincronizacion` arriba de `Portada`: visible en todas las pantallas. El "Reintentar" sin edición previa queda en el catálogo. |
+| E8 | El ViewModel recibía el banco de pruebas (`ServicioLocal`). | Dependencia de Android innecesaria: no se podía instanciar en un test JVM. | `MainActivity` toma la Mesa de `Servicios` y se la pasa a `Portada`; el ViewModel solo depende de `Agenda`, `SesionDeCarga` y `SavedStateHandle`. |
 | E6 | Al retirarse una charla abierta o agendada no se informaba nada. | Ficha en blanco; la charla desaparece de Mi agenda sin explicación. | "Esta charla fue retirada del programa" en la ficha y aviso con los títulos retirados de Mi agenda tras sincronizar. |
 
 ## Evidencia
 
-- `./gradlew assembleDebug testDebugUnitTest`: compila y pasan **6/6 tests** (`InstantaneaTest`: marca conservada en v2 con título/sala nuevos, marca hecha durante la petición, 11 retirada en v3, charla que regresa sin marcar, v4 vacía, ficha incompleta rechazada).
-- Prueba manual en emulador (Pixel, API 36): `pm clear` + arranque online → v1 con 12 charlas. Reabrir con `--ez servicio_disponible false` → "Sin conexión: se están usando datos guardados." con la lista visible. Dos rotaciones → la Mesa muestra "Peticiones en esta sesión: 1".
+**Automática:** `./gradlew assembleDebug testDebugUnitTest` compila y pasan **9/9 tests**.
+- `InstantaneaTest` (6): marca conservada en v2 con título/sala nuevos, marca hecha durante la petición, 11 retirada en v3, charla que regresa sin marcar, v4 vacía, ficha incompleta rechazada.
+- `ProgramaModelTest` (3): una sola carga automática por proceso aunque se recree el ViewModel; dos toques durante una petición = un intento y tras la falla se puede volver a pedir; filtros recuperados del `SavedStateHandle` y tarea nueva sin filtros.
+
+**Manual en emulador (Pixel 10 Pro, API 36), resultados observados:**
+
+| Prueba | Resultado |
+| --- | --- |
+| Actualización desde la versión instalada (APK original con datos → APK nuevo encima) | Sin crash, charlas conservadas, sin señal reconoce la edición previa ("Sin conexión: se están usando datos guardados."). |
+| v1: marcar la 11 → v2 | La 11 muestra «Compose en producción avanzada» · «Sala Puerto» · "En mi agenda". |
+| → v3 | Desaparece la 11 del catálogo y de Mi agenda, aparece «Clínica de trazas» (90) y el aviso "Se retiró del programa: Compose en producción avanzada". |
+| → v1 de nuevo | La 11 vuelve **sin marcar**. |
+| Demora larga: Actualizar y, durante la espera, agregar «Navegación entre pantallas» | Al llegar la respuesta la marca se conserva. |
+| Demora larga: 3 toques seguidos en Actualizar | El contador de la Mesa sube de 4 a 5 (un solo intento). Los filtros se pueden cambiar durante la espera. |
+| v4 | "Sin charlas programadas." |
+| Reabrir sin servicio con v4 guardada | "Sin conexión: se están usando datos guardados." + "Sin charlas programadas." |
+| `pm clear` + arranque con `--ez servicio_disponible false` | "No se pudo descargar el programa (sin conexión)." + Reintentar. |
+| Rotar dos veces | El contador de la Mesa queda en 1. |
+| Día 2 + Datos → abrir «Cachés para viajeros» → Volver → rotar | 2 resultados de Datos (Cachés para viajeros, Consultas observables). |
+| Ficha abierta → Inicio → `adb shell am kill ar.jornadas` → volver desde Recientes | Se recupera la ficha; al volver, Día 2 + Datos siguen aplicados. |
+| Abrir desde el ícono (tarea nueva) tras matar el proceso | Arranca sin filtros. |
+
+**Limitación observada (no modificada):** en horizontal, el encabezado y los filtros ocupan casi toda la altura y la lista queda muy chica (hay que desplazarla). Es del diseño original y no afecta el estado.
 
 ## Cómo verificar (con la Mesa)
 

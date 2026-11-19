@@ -26,16 +26,11 @@ fun Catalogo(model: ProgramaModel, estadoLista: LazyListState, abrir: (String) -
 
     val actual = estado.cartelera ?: return // Room todavía no respondió
     // Pedido 41: una falla ya no reemplaza la lista. Con edición previa se avisa y se sigue mostrando.
-    when (val r = estado.ultimoResultado) {
-        null -> {}
-        is ResultadoSync.Ok -> if (r.retiradasDeMiAgenda.isNotEmpty())
-            Text("Se retiró del programa: ${r.retiradasDeMiAgenda.joinToString()}. Ya no está en Mi agenda.")
-        else -> if (actual.hayEdicion) {
-            Text("${causa(r)}: se están usando datos guardados.")
-        } else {
-            Text("No se pudo descargar el programa (${causa(r).lowercase()}).")
-            OutlinedButton(onClick = model::actualizar, enabled = !estado.cargando) { Text("Reintentar") }
-        }
+    // (El aviso "se están usando datos guardados" se muestra en Portada, visible en todas las pantallas.)
+    val r = estado.ultimoResultado
+    if (!actual.hayEdicion && r != null && r !is ResultadoSync.Ok) {
+        Text("No se pudo descargar el programa (${causa(r).lowercase()}).")
+        OutlinedButton(onClick = model::actualizar, enabled = !estado.cargando) { Text("Reintentar") }
     }
     if (!actual.hayEdicion) return
     if (actual.charlas.isEmpty()) {
@@ -47,6 +42,23 @@ fun Catalogo(model: ProgramaModel, estadoLista: LazyListState, abrir: (String) -
     }
     if (visibles.isEmpty()) Text("No hay charlas con estos filtros.")
     Grilla(visibles, abrir, estadoLista)
+}
+
+/**
+ * Pedido 41: con una edición previa, la falla se informa arriba de cualquier pantalla (Programa,
+ * Mi agenda o una ficha), porque la consigna pide conservar lista, detalle y favoritas E informar.
+ */
+@Composable
+fun AvisoSincronizacion(estado: ProgramaUiState) {
+    val hayEdicion = estado.cartelera?.hayEdicion == true
+    when (val r = estado.ultimoResultado) {
+        null -> {}
+        is ResultadoSync.Ok -> if (r.retiradasDeMiAgenda.isNotEmpty())
+            Text("Se retiró del programa: ${r.retiradasDeMiAgenda.joinToString()}. Ya no está en Mi agenda.",
+                color = MaterialTheme.colorScheme.secondary)
+        else -> if (hayEdicion)
+            Text("${causa(r)}: se están usando datos guardados.", color = MaterialTheme.colorScheme.secondary)
+    }
 }
 
 private fun causa(r: ResultadoSync): String = when (r) {

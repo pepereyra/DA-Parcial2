@@ -12,9 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ar.jornadas.lab.ServicioLocal
 
 @Composable
-fun Portada(model: ProgramaModel) {
+fun Portada(model: ProgramaModel, mesa: ServicioLocal) {
     var seccion by rememberSaveable { mutableStateOf("Programa") }
     var detalle by rememberSaveable { mutableStateOf<String?>(null) }
     val estado by model.uiState.collectAsStateWithLifecycle()
@@ -38,6 +39,7 @@ fun Portada(model: ProgramaModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Spacer(Modifier.height(8.dp))
                 Text("Jornadas del Sur", style = MaterialTheme.typography.labelLarge)
+                AvisoSincronizacion(estado)
                 if (detalle != null) {
                     TextButton(onClick = { detalle = null }) { Text("Volver") }
                     val ficha = charlas.find { it.id == detalle }
@@ -61,7 +63,7 @@ fun Portada(model: ProgramaModel) {
                             if (guardadas.isEmpty()) Text("Todavía no agregaste charlas.")
                             Grilla(guardadas, abrir = { detalle = it })
                         }
-                        else -> Mesa(model.mesa)
+                        else -> Mesa(mesa)
                     }
                 }
             }

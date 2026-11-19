@@ -10,8 +10,8 @@ android {
         applicationId = "ar.jornadas"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "1.2"
+        versionCode = 13
+        versionName = "1.3"
     }
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
@@ -38,4 +38,5 @@ dependencies {
     // (toMediaType/toResponseBody) que usa lab/ServicioLocal: el proyecto original no compilaba.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }

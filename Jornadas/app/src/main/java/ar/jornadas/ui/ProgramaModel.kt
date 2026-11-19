@@ -8,7 +8,6 @@ import ar.jornadas.Servicios
 import ar.jornadas.data.Agenda
 import ar.jornadas.data.Cartelera
 import ar.jornadas.data.ResultadoSync
-import ar.jornadas.lab.ServicioLocal
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -24,11 +23,11 @@ data class ProgramaUiState(
 
 /**
  * Las dependencias llegan por constructor (Factory abajo): el ViewModel no crea Room ni Retrofit,
- * no conoce la Activity y se puede probar con un fake de [Agenda].
+ * no conoce la Activity ni el banco de pruebas, y se puede probar con un fake de [Agenda]
+ * (ver ProgramaModelTest).
  */
 class ProgramaModel(
     private val agenda: Agenda,
-    val mesa: ServicioLocal,
     private val sesion: SesionDeCarga,
     private val estado: SavedStateHandle,
 ) : ViewModel() {
@@ -80,7 +79,7 @@ class ProgramaModel(
         val Factory = viewModelFactory {
             initializer {
                 val servicios = Servicios.de(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!)
-                ProgramaModel(servicios.agenda, servicios.mesa, servicios.sesion, createSavedStateHandle())
+                ProgramaModel(servicios.agenda, servicios.sesion, createSavedStateHandle())
             }
         }
     }
