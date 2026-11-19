@@ -2,6 +2,7 @@ package ar.jornadas.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -16,7 +17,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun Portada(model: ProgramaModel) {
     var seccion by rememberSaveable { mutableStateOf("Programa") }
     var detalle by rememberSaveable { mutableStateOf<String?>(null) }
-    val charlas by model.charlas.collectAsStateWithLifecycle()
+    val estado by model.uiState.collectAsStateWithLifecycle()
+    val charlas = estado.cartelera?.charlas.orEmpty()
+    val cargada = estado.cartelera != null
+    // Pedido 43: el estado de la lista se guarda acá (fuera del catálogo) para volver al mismo punto.
+    val estadoLista = rememberLazyListState()
     BackHandler(detalle != null || seccion != "Programa") {
         if (detalle != null) detalle = null else seccion = "Programa"
     }
@@ -36,6 +41,7 @@ fun Portada(model: ProgramaModel) {
                 if (detalle != null) {
                     TextButton(onClick = { detalle = null }) { Text("Volver") }
                     val ficha = charlas.find { it.id == detalle }
+                    if (ficha == null && cargada) Text("Esta charla fue retirada del programa.")
                     if (ficha != null) Column(Modifier.verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(ficha.titulo, style = MaterialTheme.typography.headlineMedium)
@@ -49,11 +55,11 @@ fun Portada(model: ProgramaModel) {
                 } else {
                     Text(seccion, style = MaterialTheme.typography.headlineLarge)
                     when (seccion) {
-                        "Programa" -> Catalogo(model) { detalle = it }
+                        "Programa" -> Catalogo(model, estadoLista) { detalle = it }
                         "Mi agenda" -> {
                             val guardadas = charlas.filter { it.favorita }
                             if (guardadas.isEmpty()) Text("Todavía no agregaste charlas.")
-                            Grilla(guardadas) { detalle = it }
+                            Grilla(guardadas, abrir = { detalle = it })
                         }
                         else -> Mesa(model.mesa)
                     }

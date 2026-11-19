@@ -34,4 +34,8 @@ dependencies {
     kapt("androidx.room:room-compiler:2.6.1")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    // Retrofit 2.11 trae OkHttp 3.14 transitivamente, que no tiene las extensiones Kotlin
+    // (toMediaType/toResponseBody) que usa lab/ServicioLocal: el proyecto original no compilaba.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("junit:junit:4.13.2")
 }
